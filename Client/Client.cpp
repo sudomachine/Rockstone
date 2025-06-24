@@ -112,9 +112,7 @@ void Client::login(std::shared_ptr<server::Packet> packet)
 		return;
 	}
 
-	LoginData data;
-	data.net_id = net_id;
-	data.net_type = net_type;
+	LoginData data(net_id, net_type);
 
 	this->requests->add(&data, [&](const vector<std::shared_ptr<Player>> &loaded) -> void
 	{
