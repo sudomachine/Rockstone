@@ -4,7 +4,13 @@
 #include "Log.h"
 #include "LoginData.h"
 
-Client::Client(IO *io):
+#include "server/Packet.h"
+#include "Player.h"
+#include "IO.h"
+#include "Requests.h"
+
+
+Client::Client(std::shared_ptr<IO> io):
 	io(io)
 {
 	this->requests = std::make_shared<Requests>(this);
@@ -22,9 +28,9 @@ void Client::disconnect() const
 	this->io->stop();
 }
 
-void Client::send(const server::Packet &packet) const
+void Client::send(std::shared_ptr<server::Packet> packet) const
 {
-	io->write(packet);
+	io->write(*packet);
 }
 
 void Client::on_event(const ClientEvent &event)
@@ -40,28 +46,28 @@ void Client::on_event(const ClientEvent &event)
 	}
 }
 
-void Client::on_packet(const server::Packet &packet)
+void Client::on_packet(std::shared_ptr<server::Packet> packet)
 {
-	switch (packet.get_type())
+	switch (packet->get_type())
 	{
 		case server::PacketType::PARAMS_SET:
-			this->params_set(packet);
+			this->params_set(*packet);
 			break;
 		case server::PacketType::BUY:
-			this->buy(packet);
+			this->buy(*packet);
 			break;
 		case server::PacketType::LOGIN:
-			this->login(packet);
+			this->login(*packet);
 			break;
 		default:
-			logger->warning("Unhandled packet type {}", packet.get_type());
+			logger->warning("Unhandled packet type {}", packet->get_type());
 			break;
 	}
 }
 
-void Client::params_set(const server::Packet &packet) const
+void Client::params_set(std::shared_ptr<server::Packet> packet) const
 {
-	string params = packet.S(0);
+	string params = packet->S(0);
 	if (params.empty())
 		return;
 
@@ -70,9 +76,9 @@ void Client::params_set(const server::Packet &packet) const
 	logger->info("Client {} params set", this->player->id);
 }
 
-void Client::buy(const server::Packet &packet)
+void Client::buy(std::shared_ptr<server::Packet> packet)
 {
-	uint32_t item_id = packet.I(0);
+	uint32_t item_id = packet->I(0);
 
 	if (!this->player->balance->can_afford(item_id))
 	{
@@ -86,7 +92,7 @@ void Client::buy(const server::Packet &packet)
 	logger->info("Client {} bought item {}", this->player->id, item_id);
 }
 
-void Client::login(const client::Packet *packet)
+void Client::login(std::shared_ptr<server::Packet> packet)
 {
 	uint64_t net_id = packet->L(0);
 	uint8_t net_type = packet->B(1);
@@ -110,7 +116,7 @@ void Client::login(const client::Packet *packet)
 	data.net_id = net_id;
 	data.net_type = net_type;
 
-	this->requests->add(&data, [&](const vector<Player*> &loaded) -> void
+	this->requests->add(&data, [&](const vector<std::shared_ptr<Player>> &loaded) -> void
 	{
 		this->login_do(loaded[0], &data);
 	});
